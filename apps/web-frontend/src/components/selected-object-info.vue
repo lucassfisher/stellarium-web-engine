@@ -13,7 +13,16 @@
       <div style="width: 100%">
         <img :src="icon" height="48" width="48" align="left" style="margin-top: 3px; margin-right: 10px"/>
         <div style="overflow: hidden; text-overflow: ellipsis;">
-          <div class="text-h5">{{ title }}</div>
+          <div class="text-h5" style="display: flex; align-items: center; gap: 8px;">
+            <span style="overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;">{{ title }}</span>
+            <button
+              class="stel-fav-btn"
+              :class="{ 'stel-fav-btn--active': isFavourite }"
+              @click.stop="handleFavouriteToggle"
+              :title="isFavourite ? 'Remove from favourites' : 'Add to favourites'"
+              style="flex-shrink: 0;"
+            >{{ isFavourite ? '★' : '☆' }}</button>
+          </div>
           <div class="grey--text text-body-2">{{ type }}</div>
         </div>
       </div>
@@ -90,7 +99,9 @@ export default {
       shareLink: undefined,
       showShareLinkDialog: false,
       copied: false,
-      items: []
+      items: [],
+      isFavourite: false,
+      favouriteNames: []
     }
   },
   computed: {
@@ -190,6 +201,17 @@ export default {
       }
       swh.sweObj2SkySource(this.$stel.core.selection).then(res => {
         this.$store.commit('setSelectedObject', res)
+        // Notify the React parent which object was selected
+        const names = swh.namesForSkySource(res, 26)
+        const name = names && names[0]
+        if (name) {
+          window.parent.postMessage({
+            type: 'STEL_OBJECT_SELECTED',
+            objectName: name,
+            objectType: res.types ? res.types[0] : undefined
+          }, '*')
+          this.updateFavouriteState(name)
+        }
       }, err => {
         console.log("Couldn't find info for object " + s + ':' + err)
         this.$store.commit('setSelectedObject', 0)
@@ -357,6 +379,29 @@ export default {
       this.copied = document.execCommand('copy')
       window.getSelection().removeAllRanges()
       this.showShareLinkDialog = false
+    },
+    // ── Favourites bridge ──────────────────────────────────────────────────
+    handleFavouriteToggle: function () {
+      if (!this.title) return
+      // Optimistic local toggle — parent confirms via STEL_INIT_FAVOURITES
+      this.isFavourite = !this.isFavourite
+      window.parent.postMessage({
+        type: 'STEL_TOGGLE_FAVOURITE',
+        objectName: this.title
+      }, '*')
+    },
+    handleParentMessage: function (event) {
+      const data = event.data
+      if (!data || data.type !== 'STEL_INIT_FAVOURITES') return
+      this.favouriteNames = Array.isArray(data.names) ? data.names : []
+      this.updateFavouriteState()
+    },
+    updateFavouriteState: function (nameOverride) {
+      const name = nameOverride || this.title
+      if (!name) { this.isFavourite = false; return }
+      this.isFavourite = this.favouriteNames.some(
+        function (n) { return n.toLowerCase() === name.toLowerCase() }
+      )
     }
   },
   mounted: function () {
@@ -364,6 +409,13 @@ export default {
     window.addEventListener('mouseup', function (event) {
       that.stopZoom()
     })
+    // Favourites bridge — listen for favourite-list syncs from the React parent
+    window.addEventListener('message', this.handleParentMessage)
+    // Tell the React parent this iframe is ready to receive messages
+    window.parent.postMessage({ type: 'STEL_READY' }, '*')
+  },
+  beforeDestroy: function () {
+    window.removeEventListener('message', this.handleParentMessage)
   }
 }
 </script>
@@ -384,5 +436,32 @@ export default {
 .radecUnit {
   color: #dddddd;
   font-weight: normal
+}
+
+/* ── Favourite star button ─────────────────────────────────────── */
+.stel-fav-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 6px;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.stel-fav-btn:hover {
+  color: rgba(250, 204, 21, 0.85);
+  background-color: rgba(250, 204, 21, 0.08);
+  border-color: rgba(250, 204, 21, 0.25);
+}
+
+.stel-fav-btn--active {
+  color: #facc15;
+}
+
+.stel-fav-btn--active:hover {
+  color: #fde047;
 }
 </style>

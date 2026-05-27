@@ -2,6 +2,15 @@ module.exports = {
   runtimeCompiler: true,
   publicPath: process.env.CDN_ENV ? process.env.CDN_ENV : '/',
 
+  // Use port 8081 so it doesn't clash with the backend API on 8080
+  devServer: {
+    port: 8081,
+    headers: {
+      // Allow the React app (running on any localhost port) to embed this in an iframe
+      'Access-Control-Allow-Origin': '*'
+    }
+  },
+
   chainWebpack: config => {
     // workaround taken from webpack/webpack#6642
     config.output
