@@ -1,8 +1,9 @@
-Stellarium Web Engine
+Stellarium Web Engine modified for use in Remote Scientific Data Capture & Control (Orion)
 =====================
 
 About
 -----
+Modified Stellarium Web Engine to run alongside RSDCC, imbedded favouriting system.
 
 Stellarium Web Engine is a JavaScript planetarium renderer using
 WebGL that can be embedded into a website.
